@@ -2206,7 +2206,7 @@ function buildSlipText(format){
  const today = new Date().toLocaleDateString('it-IT');
  const tipo = t.legs.length===1 ? 'Singola' : t.legs.length===2 ? 'Doppia' : t.legs.length===3 ? 'Tripla' : t.legs.length===5 ? 'Cinquina' : t.legs.length===10 ? 'Decina' : 'Multipla x'+t.legs.length;
  if(format==='telegram'){
-  let txt = '\u26BD *Match Analyzer Pro v7 \u2014 ' + tipo + ' ' + today + '*\n\n';
+  let txt = '\u26BD *StrategaAI Calcio&Stratistiche\u2014 ' + tipo + ' ' + today + '*\n\n';
   for(const l of t.legs){
    txt += '\u2022 ' + l.match + '\n';
    txt += '   \uD83D\uDCCA ' + l.market + ' @ *' + (l.odds||1).toFixed(2) + '*';
@@ -2218,7 +2218,7 @@ function buildSlipText(format){
   txt += '\uD83C\uDFAF Quota Totale: *' + totalOdds.toFixed(2) + '*\n';
   txt += '\uD83D\uDCB6 Stake: ' + fmtEur(t.stake) + '\n';
   txt += '\uD83D\uDCB0 Vincita: ' + fmtEur(winning) + '\n';
-  txt += '\nMAP v7 \uD83D\uDD25';
+  txt += '\nStrategaApp 😈 \uD83D\uDD25';
   return txt;
  }
  if(format==='whatsapp'){
