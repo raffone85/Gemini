@@ -816,22 +816,43 @@ function parseDM(text){
  const L = parseCsvLines(text); if(L.length<2) return [];
  const sep = detectDelimiter(L[0]);
  const hdr = splitCsvLine(L[0], sep);
- const findPair = function(name){
-  const first = hdr.indexOf(name);
-  if(first<0) return [-1,-1];
-  return [first, first+1];
+ // Trova tutte le occorrenze di un header. Prima = %, Seconda = quota.
+ const findAll = function(name){
+  const idxs = [];
+  for(let i=0; i<hdr.length; i++){ if(hdr[i] === name) idxs.push(i); }
+  return idxs;
  };
- const iOra = hdr.indexOf('Ora'), iMatch = hdr.indexOf('Match'), iR = hdr.indexOf('R'), iRpt = hdr.indexOf('Rpt'), iNP = hdr.indexOf('NP');
- const i1Perc = hdr.findIndex(function(h,i){return h === '1' && i > 5;});
- const i1Quota = i1Perc + 1, iXPerc = i1Quota + 1, iXQuota = iXPerc + 1, i2Perc = iXQuota + 1, i2Quota = i2Perc + 1;
- const iMGE = hdr.indexOf('MGE'), iDIFF = hdr.indexOf('DIFF');
- const iGGPerc = hdr.findIndex(function(h,i){return h === 'GG' && i > iDIFF;});
- const iGGQuota = iGGPerc + 1;
- const ovP = findPair('OV15'), ov25P = findPair('OV25'), un35P = findPair('UN35'), ov05ptP = findPair('OV0.5pt');
- const iIC = hdr.indexOf('IC'), iRC = hdr.indexOf('RC'), iRO = hdr.indexOf('RO');
- const iSCP = hdr.indexOf('SC'), iIGBC = hdr.indexOf('IGBC'), iSCQ = iIGBC + 1;
- const iSOP = hdr.indexOf('SO'), iIGBO = hdr.indexOf('IGBO'), iSOQ = iIGBO + 1;
- const iRE = hdr.indexOf('RE');
+ // Coppia % + quota: cerca duplicati. Se trova solo 1, restituisce [-1,-1] (mancante).
+ const findPair = function(name){
+  const idxs = findAll(name);
+  if(idxs.length >= 2) return [idxs[0], idxs[1]];
+  return [-1, -1];
+ };
+ // Singola: il primo match.
+ const findOne = function(name){
+  const i = hdr.indexOf(name);
+  return i;
+ };
+ const iOra = findOne('Ora'), iMatch = findOne('Match'), iR = findOne('R'), iRpt = findOne('Rpt'), iNP = findOne('NP');
+ // 1X2: pattern "1, 1, X, X, 2, 2" (% + quota)
+ const i1Pair = findPair('1');
+ const iXPair = findPair('X');
+ const i2Pair = findPair('2');
+ const iMGE = findOne('MGE'), iDIFF = findOne('DIFF');
+ // Mercati gol: tutti duplicati (% + quota)
+ const iGGPair = findPair('GG');
+ const iOV15Pair = findPair('OV15');
+ const iOV25Pair = findPair('OV25');
+ const iUN35Pair = findPair('UN35');
+ const iOV05ptPair = findPair('OV0.5pt');
+ // SC, SO: NON duplicati. Quota e' la colonna dopo IGBC/IGBO.
+ const iIC = findOne('IC'), iRC = findOne('RC'), iRO = findOne('RO');
+ const iSCP = findOne('SC'), iIGBC = findOne('IGBC');
+ const iSCQ = iIGBC >= 0 ? iIGBC + 1 : -1;
+ const iSOP = findOne('SO'), iIGBO = findOne('IGBO');
+ const iSOQ = iIGBO >= 0 ? iIGBO + 1 : -1;
+ const iRE = findOne('RE');
+ const cell = (f, idx) => idx>=0 && idx<f.length ? f[idx] : '';
  const rows = [];
  for(let i=1;i<L.length;i++){
   const f = splitCsvLine(L[i], sep);
@@ -839,20 +860,20 @@ function parseDM(text){
   const match = f[iMatch] ? f[iMatch].replace(/^"|"$/g,'').trim() : '';
   if(!match) continue;
   rows.push({
-   ora: cleanTime(f[iOra]||''), match, r: f[iR]||'', rpt: f[iRpt]||'', np: piOr0(f[iNP]),
-   p1: pfOr0(f[i1Perc]), q1: pfOr0(f[i1Quota]),
-   pX: pfOr0(f[iXPerc]), qX: pfOr0(f[iXQuota]),
-   p2: pfOr0(f[i2Perc]), q2: pfOr0(f[i2Quota]),
-   mge: pfOr0(f[iMGE]), diff: pfOr0(f[iDIFF]),
-   pGG: pfOr0(f[iGGPerc]), qGG: pfOr0(f[iGGQuota]),
-   pOV15: pfOr0(f[ovP[0]]), qOV15: pfOr0(f[ovP[1]]),
-   pOV25: pfOr0(f[ov25P[0]]), qOV25: pfOr0(f[ov25P[1]]),
-   pUN35: pfOr0(f[un35P[0]]), qUN35: pfOr0(f[un35P[1]]),
-   pOV05pt: pfOr0(f[ov05ptP[0]]), qOV05pt: pfOr0(f[ov05ptP[1]]),
-   ic: piOr0(f[iIC]), rc: piOr0(f[iRC]), ro: piOr0(f[iRO]),
-   pSC: pfOr0(f[iSCP]), qSC: pfOr0(f[iSCQ]), igbc: piOr0(f[iIGBC]),
-   pSO: pfOr0(f[iSOP]), qSO: pfOr0(f[iSOQ]), igbo: piOr0(f[iIGBO]),
-   re: iRE>=0 ? (f[iRE]||'') : '',
+   ora: cleanTime(cell(f,iOra)), match, r: cell(f,iR), rpt: cell(f,iRpt), np: piOr0(cell(f,iNP)),
+   p1: pfOr0(cell(f,i1Pair[0])), q1: pfOr0(cell(f,i1Pair[1])),
+   pX: pfOr0(cell(f,iXPair[0])), qX: pfOr0(cell(f,iXPair[1])),
+   p2: pfOr0(cell(f,i2Pair[0])), q2: pfOr0(cell(f,i2Pair[1])),
+   mge: pfOr0(cell(f,iMGE)), diff: pfOr0(cell(f,iDIFF)),
+   pGG: pfOr0(cell(f,iGGPair[0])), qGG: pfOr0(cell(f,iGGPair[1])),
+   pOV15: pfOr0(cell(f,iOV15Pair[0])), qOV15: pfOr0(cell(f,iOV15Pair[1])),
+   pOV25: pfOr0(cell(f,iOV25Pair[0])), qOV25: pfOr0(cell(f,iOV25Pair[1])),
+   pUN35: pfOr0(cell(f,iUN35Pair[0])), qUN35: pfOr0(cell(f,iUN35Pair[1])),
+   pOV05pt: pfOr0(cell(f,iOV05ptPair[0])), qOV05pt: pfOr0(cell(f,iOV05ptPair[1])),
+   ic: piOr0(cell(f,iIC)), rc: piOr0(cell(f,iRC)), ro: piOr0(cell(f,iRO)),
+   pSC: pfOr0(cell(f,iSCP)), qSC: pfOr0(cell(f,iSCQ)), igbc: piOr0(cell(f,iIGBC)),
+   pSO: pfOr0(cell(f,iSOP)), qSO: pfOr0(cell(f,iSOQ)), igbo: piOr0(cell(f,iIGBO)),
+   re: iRE>=0 ? (cell(f,iRE)) : '',
    _key: normMatchKey(match)
   });
  }
@@ -1045,7 +1066,7 @@ function evalTopPick_Un25(L, key){
  if(r.igbt >= 300) conflicts.push('IGBt offensivo');
  const dm = L.dm.get(key);
  if(dm && dm.np>=60){ const w = npWeight(dm.np); const wt = dm.pOV25 * w; if(wt < 40) boosts.push('DM Under storico'); }
- return {met:true, conditions:cond, blocks, boosts, conflicts, market:'U 2.5', dir:'under'};
+ return {met:true, conditions:cond, blocks, boosts, conflicts, market:'U 3.5', dir:'under35'};
 }
 
 function evalTopPick_MG13Casa(L, key){
@@ -1182,7 +1203,35 @@ function evalStandard_Un25(L, key){
  const dg = L.diffg.get(key);
  if(dg && dg.dgt!=null && dg.dgt > 0.5){ reasons.push('DGT>0.5'); score+=10; }
  if(reasons.length<2 || score<40) return null;
- return {market:'U 2.5', dir:'under', score:Math.min(84, 55+score*0.4), reasons};
+ return {market:'U 3.5', dir:'under35', score:Math.min(84, 55+score*0.4), reasons};
+}
+
+/* U 2.5 DERIVATO: si attiva SOLO se U 3.5 e' gia' standard/top E i dati supportano un esito Under piu' stretto.
+   Pick supplementare con score ridotto (max 75) e spiegazione esplicita del perche' anche U 2.5 e' possibile. */
+function evalDerived_Un25(L, key, un35Active){
+ if(!un35Active) return null; // serve il segnale forte di U 3.5 prima
+ const r = L.ggov25.get(key);
+ const dm = L.dm.get(key);
+ const gz = L.gz.get(key);
+ const dg = L.diffg.get(key);
+ const reasons = []; let score = 0;
+ // 1) Diff molto alto = squadra dominante con storico Under
+ if(r && r.diff > 1.8){ reasons.push('Diff='+r.diff.toFixed(2)+' (forte squilibrio)'); score+=25; }
+ // 2) MGE basso = pochi gol attesi
+ if(r && r.mge > 0 && r.mge < 2.6){ reasons.push('MGE='+r.mge.toFixed(2)+' (sotto 2.6)'); score+=25; }
+ // 3) IGBt basso = squadre poco offensive
+ if(r && r.igbt > 0 && r.igbt < 220){ reasons.push('IGBt='+r.igbt+' (poco offensive)'); score+=15; }
+ // 4) GZ molto negativo = mercato squilibrato Under
+ if(gz && gz.gz!=null && gz.gz < -1500){ reasons.push('GZ='+gz.gz.toFixed(0)+' (Under marcato)'); score+=20; }
+ // 5) DM Ov 1.5: se la quota Ov 1.5 e' alta vuol dire che il mercato non si aspetta nemmeno 2 gol
+ if(dm && dm.qOV15 && dm.qOV15 > 1.45){ reasons.push('Q Ov1.5='+dm.qOV15.toFixed(2)+' (mercato pessimista sui gol)'); score+=10; }
+ // 6) DM pOV15 basso (storico pochi Ov 1.5)
+ if(dm && dm.np>=30 && dm.pOV15 < 60){ reasons.push('DM OV1.5 storico solo '+dm.pOV15.toFixed(0)+'%'); score+=15; }
+ // 7) DGT molto positivo: sovrafrequenza marcata
+ if(dg && dg.dgt!=null && dg.dgt > 1){ reasons.push('DGT='+dg.dgt.toFixed(2)+' (sovrafrequenza)'); score+=15; }
+ // Soglia molto alta perche' U 2.5 e' piu' rischioso di U 3.5
+ if(reasons.length<3 || score<55) return null;
+ return {market:'U 2.5', dir:'under25', score:Math.min(75, 50+score*0.3), reasons, derived:true};
 }
 
 function evalStandard_Ov15(L, key){
@@ -1314,8 +1363,8 @@ function evalMonitor_Generic(L, key){
  if(r && r.igbt >= 220) out.push({market:'Ov 2.5', dir:'over', score:42, reasons:['IGBt='+r.igbt]});
  else if(dm && dm.pOV25 >= 45) out.push({market:'Ov 2.5', dir:'over', score:40, reasons:['DM OV25 '+dm.pOV25.toFixed(0)+'%']});
 
- if(r && r.diff > 0.8) out.push({market:'U 2.5', dir:'under', score:42, reasons:['Diff='+r.diff.toFixed(2)]});
- else if(dm && dm.pUN35 >= 45) out.push({market:'U 2.5', dir:'under', score:40, reasons:['DM UN35 '+dm.pUN35.toFixed(0)+'%']});
+ if(r && r.diff > 0.8) out.push({market:'U 3.5', dir:'under35', score:42, reasons:['Diff='+r.diff.toFixed(2)]});
+ else if(dm && dm.pUN35 >= 45) out.push({market:'U 3.5', dir:'under35', score:40, reasons:['DM UN35 '+dm.pUN35.toFixed(0)+'%']});
 
  if(dm && dm.pOV15 >= 50) out.push({market:'Ov 1.5', dir:'ov15', score:40, reasons:['DM OV15 '+dm.pOV15.toFixed(0)+'%']});
 
@@ -1381,16 +1430,19 @@ function operationalOdds(market, L, key){
  const ov = L.ov05pt.get(key);
  const qv = L.qVal.get(key);
  const firstValid = (...vals) => { for(const v of vals){ if(v && v>1.01) return v; } return null; };
- if(market==='Ov 0.5 PT') return firstValid(ov?ov.qrOv05:null, dm?dm.qOV05pt:null);
+ // Mercati Gol: SEMPRE prima fonte = DataMining Plus (seconda colonna duplicata)
+ if(market==='Ov 0.5 PT') return firstValid(dm?dm.qOV05pt:null, ov?ov.qrOv05:null);
  if(market==='GG') return firstValid(dm?dm.qGG:null);
- if(market==='Ov 2.5') return firstValid(dg?dg.qrL:null, ggov?ggov.qov25:null, dm?dm.qOV25:null);
  if(market==='Ov 1.5') return firstValid(dm?dm.qOV15:null);
- if(market==='U 2.5') return firstValid(dm?dm.qUN35:null);
+ if(market==='Ov 2.5') return firstValid(dm?dm.qOV25:null, dg?dg.qrL:null, ggov?ggov.qov25:null);
+ if(market==='U 3.5') return firstValid(dm?dm.qUN35:null);
+ if(market==='U 2.5') return firstValid(dg?dg.qrL:null, ggov?ggov.qov25:null); // U2.5 segnale derivato (no DM diretto)
  if(market==='Casa Segna') return firstValid(dm?dm.qSC:null);
  if(market==='Ospite Segna') return firstValid(dm?dm.qSO:null);
- if(market==='1') return firstValid(qv?qv.r1:null, dm?dm.q1:null);
- if(market==='X') return firstValid(qv?qv.rx:null, dm?dm.qX:null);
- if(market==='2') return firstValid(qv?qv.r2:null, dm?dm.q2:null);
+ // 1X2: prima fonte DM, fallback Quote Valore
+ if(market==='1') return firstValid(dm?dm.q1:null, qv?qv.r1:null);
+ if(market==='X') return firstValid(dm?dm.qX:null, qv?qv.rx:null);
+ if(market==='2') return firstValid(dm?dm.q2:null, qv?qv.r2:null);
  return null;
 }
 
@@ -1416,7 +1468,7 @@ function kellyStake(p, odds, opts){
 }
 
 /* =================== CORRELAZIONE =================== */
-const CONFLICT_PAIRS = new Set(['Ov 2.5|U 2.5','U 2.5|Ov 2.5','Ov 1.5|U 2.5','U 2.5|Ov 1.5','GG|U 2.5','U 2.5|GG','MG 2-4|Ov 2.5','Ov 2.5|MG 2-4','1|X','X|1','1|2','2|1','X|2','2|X']);
+const CONFLICT_PAIRS = new Set(['Ov 2.5|U 3.5','U 3.5|Ov 2.5','Ov 1.5|U 3.5','U 3.5|Ov 1.5','GG|U 3.5','U 3.5|GG','Ov 2.5|U 2.5','U 2.5|Ov 2.5','Ov 1.5|U 2.5','U 2.5|Ov 1.5','U 2.5|U 3.5','U 3.5|U 2.5','GG|U 2.5','U 2.5|GG','MG 2-4|Ov 2.5','Ov 2.5|MG 2-4','1|X','X|1','1|2','2|1','X|2','2|X']);
 function pairKey(a,b){ return a+'|'+b; }
 function sharesTeam(matchA, matchB){
  const sa = (matchA._key||'').split(' - ');
@@ -1558,6 +1610,29 @@ function buildAllRecs(){
    }
   }
 
+  // 2ter) U 2.5 DERIVATO (pick supplementare quando U 3.5 e' solido + dati pro U 2.5)
+  const un35Active = recs.some(r => r.market === 'U 3.5' && (r.fascia === 'top' || r.fascia === 'standard'));
+  const evU25 = evalDerived_Un25(L, m._key, un35Active);
+  if(evU25 && !seenMarkets.has(evU25.market)){
+   const odds = operationalOdds(evU25.market, L, m._key);
+   if(odds && odds>1.01){
+    const finalScore = Math.round(evU25.score);
+    const pModel = clamp(finalScore/100*0.78+0.05, 0.05, 0.88);
+    const kelly = kellyStake(pModel, odds, {confidence:finalScore});
+    const u35Rec = recs.find(r => r.market === 'U 3.5' && (r.fascia === 'top' || r.fascia === 'standard'));
+    const refConf = u35Rec ? u35Rec.confidence : 60;
+    recs.push({
+     _key:m._key, match:m.evento, ora:m.ora||'', lega:m.lega||'',
+     market:evU25.market, dir:evU25.dir, odds, confidence:finalScore,
+     fascia:'standard', topPick:false, blocks:[], boosts:evU25.reasons||[], conflicts:[], conditions:[], reasons:evU25.reasons,
+     pModel, kelly, stake:kelly.eur, stakePct:kelly.pct*100, edge:kelly.edge*100,
+     sig, level:'full', hasM1:false, coverage:0.7, components:[], capped:false, capReason:'',
+     derived:true, derivedFrom:'U 3.5',
+     narrative: m.evento + ' - U 2.5 a ' + odds.toFixed(2) + ' (score ' + finalScore + '). Pick DERIVATA: U 3.5 e\' gia\' solido (conf ' + refConf + '), e i dati supportano anche un esito Under piu\' stretto. Motivi: ' + (evU25.reasons||[]).join('; ') + '. Attenzione: piu\' rischiosa di U 3.5 perche\' richiede max 2 gol invece di 3.'
+    });
+    seenMarkets.add(evU25.market);
+   }
+  }
   // 3) MONITOR
   const mons = evalMonitor_Generic(L, m._key);
   for(const ev of mons){
@@ -1666,11 +1741,13 @@ function gaugeHTML(value, size, label){
 }
 
 function fasciaBadge(rec){
- if(rec.fascia==='top') return '<span class="bdg bdg-m1">&#9733; TOP '+rec.confidence+'</span>';
- if(rec.fascia==='declassata') return '<span class="bdg bdg-skip">DECLASSATA</span>';
- if(rec.fascia==='standard') return '<span class="bdg bdg-ok">PICK '+rec.confidence+'</span>';
- if(rec.fascia==='monitor') return '<span class="bdg bdg-monitor">MON '+rec.confidence+'</span>';
- return '';
+ let bdg = '';
+ if(rec.fascia==='top') bdg = '<span class="bdg bdg-m1">&#9733; TOP '+rec.confidence+'</span>';
+ else if(rec.fascia==='declassata') bdg = '<span class="bdg bdg-skip">DECLASSATA</span>';
+ else if(rec.fascia==='standard') bdg = '<span class="bdg bdg-ok">PICK '+rec.confidence+'</span>';
+ else if(rec.fascia==='monitor') bdg = '<span class="bdg bdg-monitor">MON '+rec.confidence+'</span>';
+ if(rec.derived) bdg += '<span class="bdg bdg-neu" title="Pick derivata da '+(rec.derivedFrom||'altra')+'">DERIVATA</span>';
+ return bdg;
 }
 
 function badgesFor(rec){
@@ -2073,7 +2150,7 @@ function genButtons(){
 }
 
 function marketFilterBar(){
- const mkts = ['Ov 0.5 PT','GG','Ov 1.5','Ov 2.5','U 2.5','MG 1-3 Casa','MG 1-3 Ospite','Casa Segna','Ospite Segna','MG 2-4','1','X','2'];
+ const mkts = ['Ov 0.5 PT','GG','Ov 1.5','Ov 2.5','U 3.5','U 2.5','MG 1-3 Casa','MG 1-3 Ospite','Casa Segna','Ospite Segna','MG 2-4','1','X','2'];
  const cur = S.ui.market;
  const sort = S.ui.sort || 'fascia';
  let html = '<div class="flt-bar"><span class="flt-lbl">Mercato</span>';
@@ -2206,7 +2283,7 @@ function buildSlipText(format){
  const today = new Date().toLocaleDateString('it-IT');
  const tipo = t.legs.length===1 ? 'Singola' : t.legs.length===2 ? 'Doppia' : t.legs.length===3 ? 'Tripla' : t.legs.length===5 ? 'Cinquina' : t.legs.length===10 ? 'Decina' : 'Multipla x'+t.legs.length;
  if(format==='telegram'){
-  let txt = '\u26BD *StrategaAI Calcio&Stratistiche\u2014 ' + tipo + ' ' + today + '*\n\n';
+  let txt = '\u26BD *Match Analyzer Pro v7 \u2014 ' + tipo + ' ' + today + '*\n\n';
   for(const l of t.legs){
    txt += '\u2022 ' + l.match + '\n';
    txt += '   \uD83D\uDCCA ' + l.market + ' @ *' + (l.odds||1).toFixed(2) + '*';
@@ -2218,7 +2295,7 @@ function buildSlipText(format){
   txt += '\uD83C\uDFAF Quota Totale: *' + totalOdds.toFixed(2) + '*\n';
   txt += '\uD83D\uDCB6 Stake: ' + fmtEur(t.stake) + '\n';
   txt += '\uD83D\uDCB0 Vincita: ' + fmtEur(winning) + '\n';
-  txt += '\nStrategaApp 😈 \uD83D\uDD25';
+  txt += '\nMAP v7 \uD83D\uDD25';
   return txt;
  }
  if(format==='whatsapp'){
